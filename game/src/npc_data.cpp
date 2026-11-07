@@ -1,6 +1,5 @@
 #include <npc.hpp>
 #include <fstream>
-#include <bit>
 
 namespace game::npc{
 
