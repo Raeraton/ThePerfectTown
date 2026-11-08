@@ -44,7 +44,7 @@ public:
 
     T& operator[](size_t idx){
         if( idx >= size() )
-            throw "Arena_list[] idx out of range";
+            throw std::string{"Arena_list[] idx out of range"};
         
         size_t block_idx = idx / m_block_size;
         size_t in_block_idx = idx % m_block_size;
@@ -53,7 +53,7 @@ public:
 
     const T& operator[](size_t idx) const {
         if( idx >= size() )
-            throw "Arena_list[] idx out of range";
+            throw std::string{"Arena_list[] idx out of range"};
         
         size_t block_idx = idx / m_block_size;
         size_t in_block_idx = idx % m_block_size;

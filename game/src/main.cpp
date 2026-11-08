@@ -1,10 +1,11 @@
 #include <iostream>
-#include <npc.hpp>
+#include <n_npc.hpp>
 #include <ctime>
 #include <chrono>
 
 
 int main(int argc, char** argv){
+try{
     srand(std::time(NULL));
 
 
@@ -37,5 +38,7 @@ int main(int argc, char** argv){
     std::cout << "init time: " << dur1 << " sec\n";
     std::cout << "sim  took: " << dur2 << " sec\n";
     std::cout << "all      : " << dur1 + dur2 << " sec\n";
-    
+}catch(std::string err){
+    std::cerr << "[error] "<< err << "\n";
+}
 }

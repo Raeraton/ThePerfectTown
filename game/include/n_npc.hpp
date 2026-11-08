@@ -1,6 +1,7 @@
 #ifndef N_NPC_HPP
 #define N_NPC_HPP
 
+#include <unordered_set>
 #include <vector>
 #include <cstdint>
 #include <string>
@@ -28,6 +29,9 @@ struct Namedb{
 template<typename T>
 using List = std::vector<T>;
 
+template<typename T>
+using Set = std::unordered_set<T>;
+
 typedef uint32_t People_idx;
 typedef uint32_t Apartman_idx;
 typedef uint32_t Residence_idx;
@@ -48,8 +52,8 @@ struct Connection{
         CON_NONE
     };
 
-    Connection_type type;
-    People_idx target;
+    Connection_type type=CON_NONE;
+    People_idx target=0;
 
     Connection() = default;
     Connection(Connection_type type, People_idx people)
@@ -96,6 +100,10 @@ struct Connection{
         }
     }
 
+    inline bool operator==(const Connection& oth) const noexcept{
+        return target==oth.target;
+    }
+
 };
 
 
@@ -114,7 +122,7 @@ class Residenceses {
             m_count != m_residents.size() ||
             m_count != m_apartmans.size() ||
             m_count != m_rents.size()
-        ) throw "Residenceses integrity error";
+        ) throw std::string{"Residenceses integrity error"};
     }
 
 public:
@@ -140,22 +148,22 @@ public:
     }
 
     inline uint8_t& max_resident_count(Residence_idx idx){
-        if(idx >= m_count) throw "Residence idx out of range";
+        if(idx >= m_count) throw std::string{"Residence idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_max_resident_counts[idx];
     }
     
     inline List<People_idx>& residents(Residence_idx idx){
-        if(idx >= m_count) throw "Residence idx out of range";
+        if(idx >= m_count) throw std::string{"Residence idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_residents[idx];
     }
     
     inline Apartman_idx apartman(Residence_idx idx){
-        if(idx >= m_count) throw "Residence idx out of range";
+        if(idx >= m_count) throw std::string{"Residence idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_apartmans[idx];
     }
 
     inline int64_t& rent(Residence_idx idx){
-        if(idx >= m_count) throw "Residence idx out of range";
+        if(idx >= m_count) throw std::string{"Residence idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_rents[idx];
     }
 
@@ -172,7 +180,7 @@ class Apartmans{
         if(
                 m_count != m_max_residence_count.size() ||
                 m_count != m_residenceses.size()
-          ) throw "Apartmans integrity error";
+          ) throw std::string{"Apartmans integrity error"};
     }
 
 public:
@@ -194,11 +202,11 @@ public:
     }
 
     inline Residence_idx max_resident_count(Apartman_idx idx){
-        if( idx >= m_count) throw "Apartmans idx out of range";
+        if( idx >= m_count) throw std::string{"Apartmans idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_max_residence_count[idx];
     }
     inline List<Residence_idx>& residenceses(Apartman_idx idx){
-        if( idx >= m_count) throw "Apartmans idx out of range";
+        if( idx >= m_count) throw std::string{"Apartmans idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_residenceses[idx];
     }
 
@@ -221,7 +229,7 @@ class Jobs {
             m_count != m_workers.size() ||
             m_count != m_workplaces.size() ||
             m_count != m_salery4hours.size()
-        ) throw "Jobs integrity error";
+        ) throw std::string{"Jobs integrity error"};
     }
 
 public:
@@ -251,32 +259,32 @@ public:
     }
 
     inline uint8_t& work_days(Job_idx idx){
-        if(idx >= m_count) throw "Job idx out of range";
+        if(idx >= m_count) throw std::string{"Job idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_work_days[idx];
     }
 
     inline uint8_t& schedule(Job_idx idx){
-        if(idx >= m_count) throw "Job idx out of range";
+        if(idx >= m_count) throw std::string{"Job idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_schedules[idx];
     }
 
     inline uint16_t& max_worker_count(Job_idx idx){
-        if(idx >= m_count) throw "Job idx out of range";
+        if(idx >= m_count) throw std::string{"Job idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_max_worker_counts[idx];
     }
 
     inline List<People_idx>& workers(Job_idx idx){
-        if(idx >= m_count) throw "Job idx out of range";
+        if(idx >= m_count) throw std::string{"Job idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_workers[idx];
     }
 
     inline Workspace_idx& workplace(Job_idx idx){
-        if(idx >= m_count) throw "Job idx out of range";
+        if(idx >= m_count) throw std::string{"Job idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_workplaces[idx];
     }
 
     inline int64_t& salery4hour(Job_idx idx){
-        if(idx >= m_count) throw "Job idx out of range";
+        if(idx >= m_count) throw std::string{"Job idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_salery4hours[idx];
     }
 };
@@ -293,7 +301,7 @@ class Workplaces {
         if(
             m_count != m_max_job_counts.size() ||
             m_count != m_jobs.size()
-        ) throw "Workplaces integrity error";
+        ) throw std::string{"Workplaces integrity error"};
     }
 
 public:
@@ -315,12 +323,12 @@ public:
     }
 
     inline uint16_t& max_job_count(Workspace_idx idx){
-        if(idx >= m_count) throw "Workplace idx out of range";
+        if(idx >= m_count) throw std::string{"Workplace idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_max_job_counts[idx];
     }
 
     inline List<Job_idx>& jobs(Workspace_idx idx){
-        if(idx >= m_count) throw "Workplace idx out of range";
+        if(idx >= m_count) throw std::string{"Workplace idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_jobs[idx];
     }
 };
@@ -347,7 +355,7 @@ class Peoples {
     List<Job_idx> m_jobs;
     List<Residence_idx> m_homes;
 
-    List<List<Connection>> m_connections;
+    List<Set<Connection>> m_connections;
 
     inline void check_integrity() const {
         if(
@@ -364,7 +372,7 @@ class Peoples {
             m_count != m_jobs.size() ||
             m_count != m_homes.size() ||
             m_count != m_connections.size()
-        ) throw "Peoples integrity error";
+        ) throw std::string{"Peoples integrity error"};
     }
 
 public:
@@ -384,7 +392,7 @@ public:
         const std::string& name,
         Job_idx job,
         Residence_idx home,
-        const List<Connection>& connections
+        const Set<Connection>& connections
     ){
         m_count++;
         m_sexes.push_back(sex);
@@ -408,79 +416,81 @@ public:
     }
 
     inline bool get_sex(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_sexes[idx];
     }
 
     inline bool get_alive(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_alives[idx];
     }
 
     inline void set_sex(People_idx idx, bool v){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         m_sexes[idx] = v;
     }
 
     inline void set_alive(People_idx idx, bool v){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         m_alives[idx] = v;
     }
 
     inline util::Fixpoint_num& elszantsag(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_elszantsags[idx];
     }
 
     inline util::Fixpoint_num& optimizmus(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_optimizmuses[idx];
     }
 
     inline util::Fixpoint_num& szabalykovetes(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_szabalykovetesek[idx];
     }
 
     inline util::Fixpoint_num& szepseg(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_szepsegek[idx];
     }
 
     inline util::Fixpoint_num& erosseg(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_erossegek[idx];
     }
 
     inline util::Fixpoint_num& okossag(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_okossagok[idx];
     }
 
     inline int64_t& balance(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_balances[idx];
     }
 
     inline std::string& name(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_names[idx];
     }
 
     inline Job_idx& job(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_jobs[idx];
     }
 
     inline Residence_idx& home(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_homes[idx];
     }
 
-    inline List<Connection>& connections(People_idx idx){
-        if(idx >= m_count) throw "People idx out of range";
+    inline Set<Connection>& connections(People_idx idx){
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_connections[idx];
     }
+
+    double get_simpathy( People_idx p, People_idx target );
 };
 
 
@@ -499,11 +509,11 @@ class World{
 
 public:
 
-    World();
+    World(size_t people_count);
 
     void update();
 
-    void print() const;
+    void print();
 
     void add_residence(
             uint8_t max_resident_count,
@@ -548,7 +558,7 @@ public:
         const std::string& name,
         Job_idx job,
         Residence_idx home,
-        const List<Connection>& connections){
+        const Set<Connection>& connections){
 
         peoples.add(sex, alive, elszantsag, optimizmus, szabalykovetes, szepseg,
             erosseg, okossag, balance, name, job, home, connections );
@@ -557,9 +567,26 @@ public:
 };
 
 
-
-
 }
+
+
+
+
+
+
+namespace std{
+template<>
+struct hash<game::npc::Connection> {
+    size_t operator()(const game::npc::Connection& con)const noexcept{
+        return con.target;
+    }
+};
+}
+
+
+
+
+
 
 
 
