@@ -11,10 +11,11 @@ Fixpoint_num::Fixpoint_num(double _num){
 }
 Fixpoint_num::Fixpoint_num(num_type _num): num{_num} {}
 
-Fixpoint_num& Fixpoint_num::operator=(double _num){
-    num = (num_type)(_num * max_val);
-    return *this;
+
+Fixpoint_num::Fixpoint_num(const Fixpoint_num& o){
+    num = o.num;
 }
+
 
 
 Fixpoint_num Fixpoint_num::operator+(Fixpoint_num oth)const{

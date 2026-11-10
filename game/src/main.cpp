@@ -26,7 +26,9 @@ try{
 
 
     for( size_t _=0; _<iteration; _++ ){
-        world.update();
+        int day = (_ / 24) % 7;
+        int hour = _ % 24;
+        world.update(game::npc::Time_range{day, hour}, (_+1)%(168*4)==0);
     }
     
     tp = std::chrono::high_resolution_clock::now();
@@ -39,6 +41,8 @@ try{
     std::cout << "sim  took: " << dur2 << " sec\n";
     std::cout << "all      : " << dur1 + dur2 << " sec\n";
 }catch(std::string err){
-    std::cerr << "[error] "<< err << "\n";
+    std::cerr<<"[error] "<<err<<"\n";
+}catch(...){
+    std::cerr<<"[unknown error]\n";
 }
 }

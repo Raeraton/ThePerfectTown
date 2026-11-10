@@ -38,29 +38,49 @@ Namedb::Namedb(const char* first_path, const char* last_path){
 
 
 
+Group_event Group_event::cleanup(Peoples& peoples){
+    
+    Group_event out;
+
+    for( Event_idx e : m_valid_events ){
+        for( People_idx p : participant(e) ){
+            auto& events = peoples.event(p);
+            events.erase(e);
+            events.insert(out.count());
+        }
+        out.add(m_locations[e], m_participants[e], m_types[e], m_times[e]);
+    }
+
+    return out;
+
+}
+
+
+
+
+
+
+
 static void add_default_residence(World& world,
-        Apartman_idx apartman){
-    uint8_t max_resident_count = 8;
+        Apartman_idx apartman, uint8_t max_resident_count){
     List<People_idx> residents{};
     int64_t rent = 150000 + (rand() % 100000);
     world.add_residence(max_resident_count, residents,
             apartman, rent);
 }
 
-static void add_default_apartman(World& world){
-    Residence_idx max_resident_count = 16;
+static void add_default_apartman(World& world, Residence_idx max_resident_count){
     List<Residence_idx> residenceses{};
 
     world.add_apartman(max_resident_count, residenceses);
 }
 
-static void add_default_job(World& world, Workspace_idx workplace){
-    uint8_t work_days = HETFO_FLAG & KEDD_FLAG & SZERDA_FLAG
-        & CSUTORTOK_FLAG & PENTEK_FLAG;
+static void add_default_job(World& world, Workspace_idx workplace,
+        uint16_t max_worker_count){
+    uint8_t work_days = HETFO_FLAG ^ KEDD_FLAG ^ SZERDA_FLAG
+        ^ CSUTORTOK_FLAG ^ PENTEK_FLAG;
 
-    uint8_t schedule = (rand() % 10) + (rand() % 4) * 32;
-
-    uint16_t max_worker_count = 8;
+    uint8_t schedule = ((rand()%12)<<4) + (rand() & 0b1111);
     List<People_idx> workers{};
 
     int64_t salery4hour = 1200 + (rand() % 2000);
@@ -75,15 +95,14 @@ static void add_default_job(World& world, Workspace_idx workplace){
     );
 }
 
-static void add_default_workplace(World& world){
-    uint16_t max_job_count = 12;
+static void add_default_workplace(World& world, uint16_t max_job_count){
     List<Job_idx> jobs{};
 
     world.add_workplace(max_job_count, jobs);
 }
 
 static void add_default_people(World& world,const Namedb& namedb, Job_idx job, Residence_idx home){
-    bool sex = rand() % 2;
+    bool sex = rand() & 1;
     bool alive = true;
 
     util::Fixpoint_num elszantsag = (rand() % 100) / 100.0;
@@ -92,14 +111,16 @@ static void add_default_people(World& world,const Namedb& namedb, Job_idx job, R
     util::Fixpoint_num szepseg = (rand() % 100) / 100.0;
     util::Fixpoint_num erosseg = (rand() % 100) / 100.0;
     util::Fixpoint_num okossag = (rand() % 100) / 100.0;
+    util::Fixpoint_num hangulat = (rand() % 100) / 100.0;
 
-    int64_t balance = rand() % 500000;
+    int64_t balance = 0;
 
     std::string name = 
         namedb.firsts[rand() % namedb.firsts.size()]
         + " " + namedb.lasts[rand() % namedb.lasts.size()];   
 
     Set<Connection> connections;
+    Set<Event_idx> events;
 
     world.add_people(
         sex,
@@ -110,11 +131,13 @@ static void add_default_people(World& world,const Namedb& namedb, Job_idx job, R
         szepseg,
         erosseg,
         okossag,
+        hangulat,
         balance,
         name,
         job,
         home,
-        connections
+        connections,
+        events
     );
 }
 
@@ -138,7 +161,7 @@ void create_new_2way_connection( Peoples& peoples,
     peoples.connections(p1)
         .insert(Connection(type, p2));
     peoples.connections(p2)
-        .insert(Connection(type, p2));
+        .insert(Connection(type, p1));
 }
 
 void create_new_1way_connection( Peoples& peoples,
@@ -159,12 +182,37 @@ size_t count_connection_type(Peoples& peoples, People_idx idx,
     return out;
 }
 
+void create_new_event(Peoples& peoples, Group_event& events, const Location& location, Group_event::Type type,
+        const List<People_idx>& participants, Time_range now){
+
+    Event_idx event_idx = events.count();
+    int hour = now.raw_hour() + 24 + (rand()%24);
+    hour %= 160;
+    Time_range time{ (hour/24)%7, hour%24, 2 };
+    events.add(location, participants, type, time);
+
+    for(People_idx part : participants){
+        peoples.event(part).insert(event_idx);
+    }
+}
 
 
 
 
+void party(Peoples& peoples, const List<People_idx>& parts){
+    for( auto people : parts ){
+        double han = peoples.hangulat(people);
+        peoples.hangulat(people) = han + 0.2;
+    }
+}
 
 void attack(Peoples& peoples, People_idx p1, People_idx p2){
+    double h1 = peoples.hangulat(p1);
+    double h2 = peoples.hangulat(p2);
+
+    peoples.hangulat(p1) = h1 - 0.5;
+    peoples.hangulat(p2) = h2 - 0.5;
+
     int rn = rand();
     double pow = (double)peoples.erosseg(p1) / ((double)peoples.erosseg(p1) + peoples.erosseg(p2));
     if( pow*RAND_MAX > rn ){
@@ -176,39 +224,98 @@ void attack(Peoples& peoples, People_idx p1, People_idx p2){
     }
 }
 
-void interact(Peoples& peoples, People_idx p1, People_idx p2){
+void do_event(Peoples& peoples, Group_event& events, Event_idx event, Time_range time, Set<Event_idx>& events_to_remove){
+    auto etime = events.time(event);
+
+    if(etime < time){
+        events_to_remove.insert(event);
+        return;
+    }
+    if(!etime.is_overlapping(time)) return;
+    
+    /*/
+    std::cout << "day " << (int)time.day() << " hour " << (int)time.hour()
+                << " eday " << (int)etime.day() << " ehour " << (int)etime.hour() << " edur "
+                << (int)etime.duration() << "     --" << event << "\n";
+    */
+
+    switch(events.type(event)){
+    case Group_event::FIGHT:{
+        List<People_idx> parts = events.participant(event);
+        if(parts.size()>=2)
+            attack(peoples, parts[0], parts[1]);
+    }break;
+    case Group_event::PARTY:{
+        party(peoples, events.participant(event) );
+    }break;
+    default: break;
+    }
+}
+
+void small_talk(Peoples& peoples, People_idx p1, People_idx p2, Group_event& events,
+        Time_range now){
     if(p1 == p2) return;
     if(! peoples.get_alive(p1) || !peoples.get_alive(p2) ) return;
 
     double simp = peoples.get_simpathy(p1, p2);
     if( simp < 0.01 ){
-        attack(peoples, p1, p2);
+        create_new_event(peoples, events, {}, Group_event::FIGHT, {p1, p2}, now);
     }if(simp>0.76 && peoples.get_sex(p1)!=peoples.get_sex(p2) && peoples.get_simpathy(p2, p1)
             && count_connection_type(peoples, p1, Connection::CON_DATE) == 0
             && count_connection_type(peoples, p2, Connection::CON_DATE) == 0 ){
         create_new_2way_connection(peoples, p1, p2, Connection::CON_DATE);
-    }if(simp>0.7 && peoples.get_sex(p1)==peoples.get_sex(p2)){
+    }if(simp>0.7 && peoples.get_sex(p1)==peoples.get_sex(p2) && p1<p2){
+        for(const auto& con : peoples.connections(p1)){
+            if(con.target==p2 && con.type==Connection::CON_FRIEND) return;
+        }
         create_new_2way_connection(peoples, p1, p2, Connection::CON_FRIEND);
     }
 }
 
-void interact_with_connections(Peoples& peoples, People_idx people){
+void interact(Peoples& peoples, People_idx people, const Connection& con,
+        Group_event& events, Time_range now) {
+    
+    switch(con.type){
+    case Connection::CON_FRIEND:{
+        if( con.target < people && (rand()%6)==0 ){
+            create_new_event(peoples, events, {}, Group_event::PARTY, {con.target, people}, now);
+        }
+    }break;
+    case Connection::CON_COOWORKER:{
+        small_talk(peoples, people, con.target, events, now);
+    }break;
+    case Connection::CON_ROOMMATE:{
+        small_talk(peoples, people, con.target, events, now);
+    }break;
+    case Connection::CON_CHILD:{
+        if( con.target < people && (rand()%4==0) ){
+            create_new_event(peoples, events, {}, Group_event::PARTY, {people, con.target}, now);
+        }
+    }break;
+    case Connection::CON_PARENT:{
+        if( con.target < people && (rand()%8==0) ){
+            create_new_event(peoples, events, {}, Group_event::PARTY, {people, con.target}, now);
+        }
+    }break;
+    case Connection::CON_DATE:{
+        if( con.target < people && (rand()%4==0) ){
+            create_new_event(peoples, events, {}, Group_event::PARTY, {people, con.target}, now);
+        }
+    }break;
+    case Connection::CON_NONE:
+    default:
+    break; 
+    }
+
+}
+
+void interact_with_connections(Peoples& peoples, People_idx people, Group_event& events,
+        Time_range now){
     Set<Connection> connections_copy = peoples.connections(people);
     for( const auto& con : connections_copy )
-        interact(peoples, people, con.target );
+        interact(peoples, people, con, events, now);
 }
 
-void interact_with_roomates(Residenceses& residences, Peoples& peoples, People_idx people){
-    Residence_idx residx = peoples.home(people);
-    for( People_idx oth : residences.residents(residx) )
-        interact(peoples, people, oth);
-}
-
-void interact_with_cooworkers( Jobs& jobs, Peoples& peoples, People_idx people){
-    Job_idx job = peoples.job(people);
-    for( People_idx oth : jobs.workers(job) )
-        interact(peoples, people, oth);
-}
 
         
 
@@ -218,17 +325,17 @@ World::World(size_t people_count){
 
     Namedb namedb{"first_names.txt", "last_names.txt"};
     
-    add_default_workplace(*this);
+    add_default_workplace(*this, 5);
     Workspace_idx wpidx = 0;
 
-    add_default_job(*this, wpidx);
+    add_default_job(*this, wpidx, 7);
     Job_idx jobidx = 0;
     workplaces.jobs(wpidx).push_back(jobidx);
 
-    add_default_apartman(*this);
+    add_default_apartman(*this, 12);
     Apartman_idx apartidx = 0;
 
-    add_default_residence(*this, apartidx);
+    add_default_residence(*this, apartidx, 3);
     Residence_idx residx = 0;
     apartmans.residenceses(apartidx).push_back(residx);
 
@@ -238,27 +345,27 @@ World::World(size_t people_count){
 
         if(     jobs.max_worker_count(jobidx) <=
                 jobs.workers(jobidx).size()){
-            add_default_job(*this, wpidx);
+            add_default_job(*this, wpidx, 7);
             jobidx++;
             workplaces.jobs(wpidx).push_back(jobidx);
         }
 
         if(     workplaces.max_job_count(wpidx) <=
                 workplaces.jobs(wpidx).size()){
-            add_default_workplace(*this);
+            add_default_workplace(*this, 5);
             wpidx++;
         }
 
         if(     residences.max_resident_count(residx) <=
                 residences.residents(residx).size()){
-            add_default_residence(*this, apartidx);
+            add_default_residence(*this, apartidx, 3);
             residx++;
             apartmans.residenceses(apartidx).push_back(residx);
         }
 
         if(     apartmans.max_resident_count(apartidx) <=
                 apartmans.residenceses(apartidx).size()){
-            add_default_apartman(*this);
+            add_default_apartman(*this, 12);
             apartidx++;
         }
 
@@ -268,29 +375,54 @@ World::World(size_t people_count){
         peid++; 
         
     }
+    
+
+    for(size_t i=0;  i<peoples.count();  i++){
+        Job_idx job = peoples.job(i);
+        Residence_idx home = peoples.home(i);
+
+        for( auto roomate : residences.residents(home) )
+            create_new_2way_connection(peoples, i, roomate, Connection::CON_ROOMMATE);
+
+        for(auto cooworker : jobs.workers(job))
+            create_new_2way_connection(peoples, i, cooworker, Connection::CON_COOWORKER);
+    }
 
 }
 
 
 
-void World::update(){
+void World::update(Time_range time, bool time_to_pay_rent){
 
     for(  size_t peid = 0;  peid < peoples.count();  peid++){
         if( ! peoples.get_alive(peid) ) continue;
 
         Job_idx job_idx = peoples.job(peid);
+        Residence_idx res_idx = peoples.home(peid);
 
-        int64_t diff = std::__popcount(jobs.work_days(job_idx))
-            * 8 * jobs.salery4hour(job_idx);
-        peoples.balance(peid) += diff;
+        int64_t money_diff=0;
+        if(time_to_pay_rent) money_diff -= residences.rent(res_idx);
+        if( jobs.is_working_now(job_idx, time) ){
+            money_diff += jobs.salery4hour(job_idx);
+        }
+        peoples.balance(peid) += money_diff;
 
-        interact_with_roomates(residences, peoples, peid);
-        interact_with_cooworkers(jobs, peoples, peid);
-        interact_with_connections(peoples, peid);
+        interact_with_connections(peoples, peid, events, time);
 
         People_idx rando = rand() % peoples.count();
-        interact(peoples, peid, rando);
+        if(rand()%24 == 0)
+            small_talk(peoples, peid, rando, events, time);
     }
+
+    Set<Event_idx> events_to_delete;
+    for(  auto e : events ){
+        do_event(peoples, events, e, time, events_to_delete);
+    }
+
+    events.remove(events_to_delete, peoples);
+
+    if( time.hour() == 1 )
+        events = events.cleanup(peoples);
 
 }
 
@@ -304,7 +436,8 @@ static void print_people(Peoples& peoples, Jobs& jobs, People_idx idx) {
         << "\t alive: " << (peoples.get_alive(idx) ? "alive" : "dead")
         << "\t sex: " << (peoples.get_sex(idx) ? "male" : "female")
         << "\t salery: " << jobs.salery4hour(job)
-        << "\t work time: " << ((jobs.schedule(job) >> 5) + 4)
+        << "\t work time: " << (int)jobs.get_work_len(job)
+        << "\t work start " << (int)jobs.get_work_start(job)
         << "\t balance: " << peoples.balance(idx)
         << "\t will: " << peoples.elszantsag(idx)
         << "\t optimism: " << peoples.optimizmus(idx)
@@ -408,7 +541,9 @@ void World::print(){
     std::cout << "===============================\n"
         << "OVERALL"
         << "\n===============================\n";
-
+    
+    std::cout << "number of events: " << events.count() << "\n";
+    std::cout << "number of valid events: " << events.valid_event_count() << "\n";
     std::cout << "number off dates: " << num_off_date << "\n";
     std::cout << "number off friendships: " << num_off_friend << "\n";
     std::cout << "number off murderers: " << num_off_murderers << "\n";

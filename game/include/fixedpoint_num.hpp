@@ -16,8 +16,16 @@ struct Fixpoint_num{
     /// @param _num number between 0-1 
     Fixpoint_num(double _num = 0);
     Fixpoint_num(num_type _num);
+    Fixpoint_num(const Fixpoint_num&);
 
-    inline Fixpoint_num& operator=(double);
+    inline Fixpoint_num& operator=(double _num){
+        num = (num_type)(_num * max_val);
+        return *this;
+    }
+    inline Fixpoint_num& operator=(const Fixpoint_num& o){
+        num = o.num;
+        return *this;
+    }
 
     inline operator double() const{
         return (double)num / max_val;
