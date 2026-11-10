@@ -541,12 +541,15 @@ void World::print(){
     std::cout << "===============================\n"
         << "OVERALL"
         << "\n===============================\n";
-    
+    std::cout << "number of apartmans " << apartmans.count() << "\n";
+    std::cout << "number of residents " << residences.count() << "\n";
+    std::cout << "number of jobs " << jobs.count() << "\n";
+    std::cout << "number of workplaces " << workplaces.count() << "\n";
     std::cout << "number of events: " << events.count() << "\n";
     std::cout << "number of valid events: " << events.valid_event_count() << "\n";
-    std::cout << "number off dates: " << num_off_date << "\n";
-    std::cout << "number off friendships: " << num_off_friend << "\n";
-    std::cout << "number off murderers: " << num_off_murderers << "\n";
+    std::cout << "number of dates: " << num_off_date << "\n";
+    std::cout << "number of friendships: " << num_off_friend << "\n";
+    std::cout << "number of murderers: " << num_off_murderers << "\n";
 }
 
 

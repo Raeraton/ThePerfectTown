@@ -1,14 +1,13 @@
 #include <iostream>
 #include <n_npc.hpp>
+#include <background_traffic.hpp>
 #include <ctime>
 #include <chrono>
 
 
-int main(int argc, char** argv){
+void npc_bm(int argc, char** argv){
 try{
-    srand(std::time(NULL));
-
-
+   
     size_t population = 1000;
     size_t iteration = 120;
     if(argc > 1){
@@ -46,3 +45,124 @@ try{
     std::cerr<<"[unknown error]\n";
 }
 }
+
+
+
+
+void bg_graph_bm(int argc, char** argv) {
+    
+    int width=10;
+    int start=99;
+    int end = 0;
+    int range = 1;
+    if(argc >= 2){
+        width = std::atoi(argv[1]);
+    }
+    if( argc >= 3 ) {
+        start = std::atoi(argv[2]);
+    }if(argc >= 4 ){
+        end = std::atoi(argv[3]);
+    }if(argc >= 5 ){
+        range = std::atoi(argv[4]);
+    }
+
+    game::traffic::backgound::Graph graph{};
+
+    int node_count = 0;
+    for( int i=0;  i<width*width;  i++){
+        node_count++;
+        graph.add_node(game::traffic::backgound::Node{});
+    }
+
+    int edge_count = 0;
+    for(int y=0;  y<width;  y++){
+        for(int x=0;  x<width;  x++){
+            for(int y0=-1;  y0<2;  y0++){
+                for(int x0=-1;  x0<2;  x0++){
+                    int xx = x+x0;
+                    int yy = y+y0;
+                    if( xx<0 || yy<0 || xx>=width || yy>=width ) continue;
+                    if( x0==0 && y0 == 0 ) continue;
+                    if( y0!=0 && x0 != 0 ) continue;
+                    int idx = y*width + x;
+                    int idx0 = yy*width + xx;
+                    edge_count++;
+                    graph.add_edge(game::traffic::backgound::Edge{1, (double)(rand()%range)+1.0, (game::traffic::backgound::Node_idx)idx0}, idx);
+                }
+            }
+        }
+    }
+    
+    auto tp = std::chrono::high_resolution_clock::now();
+    auto path = graph.calculate_shortest_path(start, end);
+    double time = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - tp).count();
+    
+
+    char** lines = new char*[width*2];
+    for( int i=0;  i<width*2;  i++ ){
+        lines[i] = new char[width*2+1];
+        for(int j=0;  j<width*2;  j++)
+            lines[i][j] = ' ';
+        lines[i][width*2] = '\0';
+    }
+
+    for( int y=0;  y<width;  y++ ){
+        for( int x=0;  x<width;  x++ ){
+            lines[2*x][2*y] = '0';
+        }
+    }
+
+    for( size_t i=0;  i<path.size()-1;  i++){
+
+        int from = path[i];
+        int to = path[i+1];
+
+        int fx = from % width;
+        int fy = from / width;
+        int tx = to % width;
+        int ty = to / width;
+
+        int dx = tx - fx;
+        int dy = ty - fy;
+        lines[2*fy+dy][2*fx+dx] = dx==0?'|':'-';
+    }
+
+    for(int i=0;  i<width*2; i++){
+        std::cout << lines[i] << "\n";
+    }
+    
+    std::cout <<    "=======================\n     results       \n" <<
+                    "=======================\n";
+    std::cout << "edge count " << edge_count << "\n";
+    std::cout << "node count " << node_count << "\n";
+    std::cout << "it took " << time << " secs\n";
+
+}
+
+
+
+
+int main(int argc, char** argv){
+    srand(std::time(NULL));
+
+
+    if(argc < 2){
+        std::cout << "graph or npc\n";
+        return -1;
+    }
+
+    if(argv[1][0] == 'g'){
+        bg_graph_bm(argc-1, argv+1);
+    }else if(argv[1][0] == 'n'){
+        npc_bm(argc-1, argv+1);
+    }else{
+        std::cout << "wtf\n";
+    }
+}
+
+
+
+
+
+
+
