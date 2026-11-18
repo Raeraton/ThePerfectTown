@@ -29,22 +29,29 @@ G = ox.project_graph(G)
 
 
 
+
 # Find the bottom-left corner
 min_x = min(data['x'] for _, data in G.nodes(data=True))
 min_y = min(data['y'] for _, data in G.nodes(data=True))
 
+# Map original OSM IDs to sequential IDs
+osm_to_node_id = {
+    osm_id: new_id
+    for new_id, osm_id in enumerate(G.nodes)
+}
+
 # Convert original nodes
 nodes: list[Node] = []
 
-for node_id, data in G.nodes(data=True):
+for osm_id, data in G.nodes(data=True):
     nodes.append(Node(
-        id=node_id,
+        id=osm_to_node_id[osm_id],
         x=data['x'] - min_x,
         y=data['y'] - min_y
     ))
 
-# Generate unique IDs for additional nodes
-next_node_id = max(G.nodes) + 1
+# Next available node ID
+next_node_id = len(nodes)
 
 # Convert edges, adding nodes for road curvature
 edges: list[Edge] = []
@@ -69,16 +76,15 @@ for u, v, key, data in G.edges(keys=True, data=True):
             coordinates.reverse()
 
     else:
-        # Straight road without geometry
         coordinates = [
             (G.nodes[u]['x'], G.nodes[u]['y']),
             (G.nodes[v]['x'], G.nodes[v]['y'])
         ]
 
-    # Build a sequence of node IDs along this road
-    road_nodes = [u]
+    # Build sequence of node IDs along this road
+    road_nodes = [osm_to_node_id[u]]
 
-    # Skip first and last coordinates (they are the endpoints)
+    # Add intermediate curvature nodes
     for x, y, *rest in coordinates[1:-1]:
 
         node_id = next_node_id
@@ -92,7 +98,7 @@ for u, v, key, data in G.edges(keys=True, data=True):
 
         road_nodes.append(node_id)
 
-    road_nodes.append(v)
+    road_nodes.append(osm_to_node_id[v])
 
     # Connect consecutive nodes
     for i in range(len(road_nodes) - 1):
@@ -147,10 +153,16 @@ def plotGraph(nodes: list[Node], edges: list[Edge]) -> None:
 
 
 
-def graphToFile(nodes: list[Node], edges: list[Edge]) -> None:
-    pass
+def graphToTextFile(nodes: list[Node], edges: list[Edge]) -> None:
+    with open("graph.txt", "wt") as file:
+        file.write( f"nodes: {len(nodes)} edges: {len(edges)}\n" )
+        for node in nodes:
+            file.write( f"id: {node.id} x: {node.x} y: {node.y}\n" )
+        for edge in edges:
+            file.write( f"id: {edge.id} from: {edge.nfrom} to: {edge.nto}\n" )
 
 
 print(f"number of nodes: {len(nodes)}")
 print(f"number of edges: {len(edges)}")
 plotGraph(nodes, edges)
+graphToTextFile(nodes, edges)
