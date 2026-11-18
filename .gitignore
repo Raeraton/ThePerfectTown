@@ -1,2 +1,4 @@
 ./oot
 ./perf
+./cache
+./.cache
