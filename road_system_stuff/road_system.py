@@ -145,6 +145,12 @@ def plotGraph(nodes: list[Node], edges: list[Edge]) -> None:
 
     plt.show()
 
+
+
+def graphToFile(nodes: list[Node], edges: list[Edge]) -> None:
+    pass
+
+
 print(f"number of nodes: {len(nodes)}")
 print(f"number of edges: {len(edges)}")
 plotGraph(nodes, edges)
