@@ -1,9 +1,12 @@
 #include "fixedpoint_num.hpp"
+#include <algorithm>
 #include <cstdlib>
+#include <iterator>
 #include <n_npc.hpp>
 
 #include <fstream>
 #include <string>
+#include <vector>
 
 
 
@@ -69,10 +72,10 @@ static void add_default_residence(World& world,
             apartman, rent);
 }
 
-static void add_default_apartman(World& world, Residence_idx max_resident_count){
+static void add_default_apartman(World& world, Residence_idx max_resident_count, const Location& location){
     List<Residence_idx> residenceses{};
 
-    world.add_apartman(max_resident_count, residenceses);
+    world.add_apartman(max_resident_count, residenceses, location);
 }
 
 static void add_default_job(World& world, Workspace_idx workplace,
@@ -95,13 +98,13 @@ static void add_default_job(World& world, Workspace_idx workplace,
     );
 }
 
-static void add_default_workplace(World& world, uint16_t max_job_count){
+static void add_default_workplace(World& world, uint16_t max_job_count, const Location& location){
     List<Job_idx> jobs{};
 
-    world.add_workplace(max_job_count, jobs);
+    world.add_workplace(max_job_count, jobs, location);
 }
 
-static void add_default_people(World& world,const Namedb& namedb, Job_idx job, Residence_idx home){
+static void add_default_people(World& world,const Namedb& namedb, Jobs& jobs, Job_idx job, Residence_idx home){
     bool sex = rand() & 1;
     bool alive = true;
 
@@ -122,6 +125,9 @@ static void add_default_people(World& world,const Namedb& namedb, Job_idx job, R
     Set<Connection> connections;
     Set<Event_idx> events;
 
+    Weekly_schedule weekly_schedule;
+    weekly_schedule.add_work(jobs, job);
+
     world.add_people(
         sex,
         alive,
@@ -137,7 +143,8 @@ static void add_default_people(World& world,const Namedb& namedb, Job_idx job, R
         job,
         home,
         connections,
-        events
+        events,
+        weekly_schedule
     );
 }
 
@@ -186,9 +193,23 @@ void create_new_event(Peoples& peoples, Group_event& events, const Location& loc
         const List<People_idx>& participants, Time_range now){
 
     Event_idx event_idx = events.count();
-    int hour = now.raw_hour() + 24 + (rand()%24);
-    hour %= 160;
-    Time_range time{ (hour/24)%7, hour%24, 2 };
+    
+    List<Weekly_schedule*> schedules;
+    std::transform(
+        participants.begin(), participants.end(), std::back_inserter(schedules),
+        [&](People_idx idx){
+            return (Weekly_schedule*)(&peoples.weekly_schedule(idx));
+        }
+    );
+
+    Time_range time = Weekly_schedule::find_first(schedules, now.raw_hour(), 2);
+
+    if( time.duration() == 0) return;
+
+    for( auto sc : schedules ){
+        sc->add_time(time);
+    } 
+
     events.add(location, participants, type, time);
 
     for(People_idx part : participants){
@@ -253,13 +274,14 @@ void do_event(Peoples& peoples, Group_event& events, Event_idx event, Time_range
 }
 
 void small_talk(Peoples& peoples, People_idx p1, People_idx p2, Group_event& events,
-        Time_range now){
+        Time_range now, const std::vector<Location>& location_list){
     if(p1 == p2) return;
     if(! peoples.get_alive(p1) || !peoples.get_alive(p2) ) return;
 
     double simp = peoples.get_simpathy(p1, p2);
     if( simp < 0.01 ){
-        create_new_event(peoples, events, {}, Group_event::FIGHT, {p1, p2}, now);
+        const Location& loc = location_list[rand() % location_list.size()];
+        create_new_event(peoples, events, loc, Group_event::FIGHT, {p1, p2}, now);
     }if(simp>0.76 && peoples.get_sex(p1)!=peoples.get_sex(p2) && peoples.get_simpathy(p2, p1)
             && count_connection_type(peoples, p1, Connection::CON_DATE) == 0
             && count_connection_type(peoples, p2, Connection::CON_DATE) == 0 ){
@@ -273,33 +295,35 @@ void small_talk(Peoples& peoples, People_idx p1, People_idx p2, Group_event& eve
 }
 
 void interact(Peoples& peoples, People_idx people, const Connection& con,
-        Group_event& events, Time_range now) {
-    
+        Group_event& events, Time_range now, const std::vector<Location>& location_list) {
+   
+    const Location& loc = location_list[rand() % location_list.size()];
+
     switch(con.type){
     case Connection::CON_FRIEND:{
         if( con.target < people && (rand()%6)==0 ){
-            create_new_event(peoples, events, {}, Group_event::PARTY, {con.target, people}, now);
+            create_new_event(peoples, events, loc, Group_event::PARTY, {con.target, people}, now);
         }
     }break;
     case Connection::CON_COOWORKER:{
-        small_talk(peoples, people, con.target, events, now);
+        small_talk(peoples, people, con.target, events, now, location_list);
     }break;
     case Connection::CON_ROOMMATE:{
-        small_talk(peoples, people, con.target, events, now);
+        small_talk(peoples, people, con.target, events, now, location_list);
     }break;
     case Connection::CON_CHILD:{
         if( con.target < people && (rand()%4==0) ){
-            create_new_event(peoples, events, {}, Group_event::PARTY, {people, con.target}, now);
+            create_new_event(peoples, events, loc, Group_event::PARTY, {people, con.target}, now);
         }
     }break;
     case Connection::CON_PARENT:{
         if( con.target < people && (rand()%8==0) ){
-            create_new_event(peoples, events, {}, Group_event::PARTY, {people, con.target}, now);
+            create_new_event(peoples, events, loc, Group_event::PARTY, {people, con.target}, now);
         }
     }break;
     case Connection::CON_DATE:{
         if( con.target < people && (rand()%4==0) ){
-            create_new_event(peoples, events, {}, Group_event::PARTY, {people, con.target}, now);
+            create_new_event(peoples, events, loc, Group_event::PARTY, {people, con.target}, now);
         }
     }break;
     case Connection::CON_NONE:
@@ -310,10 +334,10 @@ void interact(Peoples& peoples, People_idx people, const Connection& con,
 }
 
 void interact_with_connections(Peoples& peoples, People_idx people, Group_event& events,
-        Time_range now){
+        Time_range now, const std::vector<Location>& location_list){
     Set<Connection> connections_copy = peoples.connections(people);
     for( const auto& con : connections_copy )
-        interact(peoples, people, con, events, now);
+        interact(peoples, people, con, events, now, location_list);
 }
 
 
@@ -321,18 +345,18 @@ void interact_with_connections(Peoples& peoples, People_idx people, Group_event&
 
 
 
-World::World(size_t people_count){
+World::World(size_t people_count, const std::vector<Location>& locations){
 
     Namedb namedb{"first_names.txt", "last_names.txt"};
     
-    add_default_workplace(*this, 5);
+    add_default_workplace(*this, 5, locations[rand() % locations.size()]);
     Workspace_idx wpidx = 0;
 
     add_default_job(*this, wpidx, 7);
     Job_idx jobidx = 0;
     workplaces.jobs(wpidx).push_back(jobidx);
 
-    add_default_apartman(*this, 12);
+    add_default_apartman(*this, 12, locations[rand()%locations.size()]);
     Apartman_idx apartidx = 0;
 
     add_default_residence(*this, apartidx, 3);
@@ -352,7 +376,7 @@ World::World(size_t people_count){
 
         if(     workplaces.max_job_count(wpidx) <=
                 workplaces.jobs(wpidx).size()){
-            add_default_workplace(*this, 5);
+            add_default_workplace(*this, 5, locations[rand() % locations.size()]);
             wpidx++;
         }
 
@@ -365,13 +389,13 @@ World::World(size_t people_count){
 
         if(     apartmans.max_resident_count(apartidx) <=
                 apartmans.residenceses(apartidx).size()){
-            add_default_apartman(*this, 12);
+            add_default_apartman(*this, 12, locations[rand()%locations.size()]);
             apartidx++;
         }
 
         residences.residents(residx).push_back(peid);
         jobs.workers(jobidx).push_back(peid);
-        add_default_people(*this, namedb, jobidx, residx);
+        add_default_people(*this, namedb, jobs, jobidx, residx);
         peid++; 
         
     }
@@ -392,7 +416,7 @@ World::World(size_t people_count){
 
 
 
-void World::update(Time_range time, bool time_to_pay_rent){
+void World::update(Time_range time, bool time_to_pay_rent, const std::vector<Location>& locations){
 
     for(  size_t peid = 0;  peid < peoples.count();  peid++){
         if( ! peoples.get_alive(peid) ) continue;
@@ -407,11 +431,11 @@ void World::update(Time_range time, bool time_to_pay_rent){
         }
         peoples.balance(peid) += money_diff;
 
-        interact_with_connections(peoples, peid, events, time);
+        interact_with_connections(peoples, peid, events, time, locations);
 
         People_idx rando = rand() % peoples.count();
         if(rand()%24 == 0)
-            small_talk(peoples, peid, rando, events, time);
+            small_talk(peoples, peid, rando, events, time, locations);
     }
 
     Set<Event_idx> events_to_delete;
@@ -421,7 +445,7 @@ void World::update(Time_range time, bool time_to_pay_rent){
 
     events.remove(events_to_delete, peoples);
 
-    if( time.hour() == 1 )
+    if( time.hour() == 0 )
         events = events.cleanup(peoples);
 
 }

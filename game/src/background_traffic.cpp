@@ -1,3 +1,4 @@
+#include "n_npc.hpp"
 #include <algorithm>
 #include <background_traffic.hpp>
 #include <limits>
@@ -7,7 +8,7 @@ namespace game::traffic::backgound{
 
 
     /// dijkstra
-    std::map<Node_idx, Node_idx> Graph::create_full_distance_table(Node_idx origin) const{
+    std::map<Node_idx, Node_idx> Graph::create_full_prev_table(Node_idx origin) const{
         
         assert_node_valid(origin);
 
@@ -32,7 +33,7 @@ namespace game::traffic::backgound{
 
                 const Edge& edge = m_edges[e];
                 
-                double cdist = current_dist + edge.lenght;
+                double cdist = current_dist + (edge.lenght/edge.speed_limit*3.6);
                 auto edist_it = dist_map.find(edge.to);
                 
                 if( edist_it == dist_map.end() ){
@@ -71,7 +72,7 @@ namespace game::traffic::backgound{
         assert_node_valid(to);
 
         std::vector<Node_idx> path;
-        auto prev_map = create_full_distance_table(from);
+        auto prev_map = create_full_prev_table(from);
 
         Node_idx current = to;
         path.push_back(current);
@@ -91,6 +92,35 @@ namespace game::traffic::backgound{
         return path;
     }
 
+    std::vector<Node_idx> Graph::get_shortest_path_from_prev_table(
+            const std::map<Node_idx, Node_idx>& prev_map, Node_idx from, Node_idx to) const{
+
+        assert_node_valid(from);
+        assert_node_valid(to);
+
+        std::vector<Node_idx> path;
+
+        Node_idx current = to;
+        path.push_back(current);
+        while( current != from ){
+            
+            auto it = prev_map.find(current);
+            if( it == prev_map.end() )
+                return {};
+
+            current = it->second;
+
+            path.push_back(current);
+        }
+
+        std::reverse(path.begin(), path.end());
+
+        return path;
+
+    }
+
+
+
     bool Graph::path_is_valid( const std::vector<Node_idx>& path ) const noexcept{
         
         for( size_t i=0;  i<path.size()-1;  i++ ){
@@ -100,6 +130,65 @@ namespace game::traffic::backgound{
         return true;
 
     }
+
+
+    void Time_table::add_trip( npc::People_idx people, double stime, const std::vector<Node_idx>& path, Graph& graph){
+
+        double time = stime;
+        for( size_t i=1;  i<path.size();  i++){
+            Edge_idx edgei;
+            if( ! graph.get_edge_between(path[i-1], path[i], &edgei) )
+                throw std::string{"game::traffic::background::Time_table::add_trip edge not found in path"};
+            const auto& edge = graph.edge(edgei);
+            
+            double dur = edge.lenght * 3.6 / edge.speed_limit;
+
+            auto it = m_table.find(edgei);
+            if(it == m_table.end() ){
+                m_table[edgei] = std::vector{
+                    Time_range{ .id=people, .start=time, .end=time+dur }
+                };
+            }else{
+                it->second.push_back(Time_range{
+                        .id=people, 
+                        .start=time, 
+                        .end=time+dur 
+                });
+            }
+
+            time += dur;
+
+        }
+
+    }
+
+    
+    std::vector<npc::People_idx> Time_table::get_peoples_at( double time_point, Edge_idx edge) const {
+
+        auto it = m_table.find( edge );
+        
+        std::vector<npc::People_idx> peoples;
+        if(it == m_table.end() ){
+            for( const auto& time_range : it->second ){
+                if( time_range.start <= time_point && time_point <= time_range.end ){
+                    peoples.push_back(time_range.id);
+                }
+            }
+        }
+
+        return peoples;
+    }
+
+
+    void Time_table::do_all( std::function< void(Edge_idx,const std::vector<Time_range>&) > func ) const{
+        for( const auto& pair : m_table ){
+            func( pair.first, pair.second );
+        }
+    }
+
+
+
+
 
 
 }

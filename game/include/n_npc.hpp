@@ -9,6 +9,7 @@
 #include <string>
 
 #include <fixedpoint_num.hpp>
+#include <location.hpp>
 
 namespace game::npc{
 
@@ -101,6 +102,8 @@ using List = std::vector<T>;
 
 template<typename T>
 using Set = std::set<T>;
+
+using Location = game::map::location::Location;
 
 typedef uint32_t People_idx;
 typedef uint32_t Apartman_idx;
@@ -256,11 +259,14 @@ class Apartmans{
     size_t m_count=0;
     List<Residence_idx> m_max_residence_count;
     List<List<Residence_idx>> m_residenceses;
+    List<Location> m_locatoins;
+
 
     inline void check_integrity() const {
         if(
                 m_count != m_max_residence_count.size() ||
-                m_count != m_residenceses.size()
+                m_count != m_residenceses.size() ||
+                m_count != m_locatoins.size()
           ) throw std::string{"Apartmans integrity error"};
     }
 
@@ -270,11 +276,13 @@ public:
 
     inline void add(
                 Residence_idx max_resident_count,
-                const List<Residence_idx>& residenceses
+                const List<Residence_idx>& residenceses,
+                const Location& location
             ){
         m_count++;
         m_max_residence_count.push_back(max_resident_count);
         m_residenceses.push_back(residenceses);
+        m_locatoins.push_back(location);
         check_integrity();
     }
     
@@ -289,6 +297,10 @@ public:
     inline List<Residence_idx>& residenceses(Apartman_idx idx){
         if( idx >= m_count) throw std::string{"Apartmans idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_residenceses[idx];
+    }
+    inline Location& location(Apartman_idx idx){
+        if( idx >= m_count) throw std::string{"Apartmans idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
+        return m_locatoins[idx];
     }
 
 };
@@ -401,11 +413,13 @@ class Workplaces {
     size_t m_count=0;
     List<uint16_t> m_max_job_counts;
     List<List<Job_idx>> m_jobs;
+    List<Location> m_locations;
 
     inline void check_integrity() const {
         if(
             m_count != m_max_job_counts.size() ||
-            m_count != m_jobs.size()
+            m_count != m_jobs.size() ||
+            m_count != m_locations.size()
         ) throw std::string{"Workplaces integrity error"};
     }
 
@@ -415,11 +429,13 @@ public:
 
     inline void add(
         uint16_t max_job_count,
-        const List<Job_idx>& jobs
+        const List<Job_idx>& jobs,
+        const Location& location
     ){
         m_count++;
         m_max_job_counts.push_back(max_job_count);
         m_jobs.push_back(jobs);
+        m_locations.push_back(location);
         check_integrity();
     }
 
@@ -436,6 +452,97 @@ public:
         if(idx >= m_count) throw std::string{"Workplace idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
         return m_jobs[idx];
     }
+
+    inline Location& location(Workspace_idx idx){
+        if(idx >= m_count) throw std::string{"Workplace idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
+        return m_locations[idx];
+    }
+};
+
+
+
+// todo     denaiveify
+struct Weekly_schedule{
+    bool busy_time[168]{0};
+
+    inline void add_work(Jobs& jobs, Job_idx idx) noexcept {
+        uint8_t work_days = jobs.work_days(idx);
+        uint8_t start = jobs.get_work_start(idx);
+        uint8_t len = jobs.get_work_len(idx);
+
+        for( int i=0;  i<7;  i++){
+            if( ! (work_days & (1<<i) ) ) continue;
+            int offset = i*24 + start;
+            for(int j=0;  j<len;  j++){
+                busy_time[offset+j] = true;
+            }
+        }
+    }
+
+    inline void add_time( Time_range time ) noexcept {
+        int day = std::__countr_zero(time.day());
+        int offset = day*24 + time.hour();
+        for( int i=0;  i<time.duration();  i++ ){
+            busy_time[i + offset] = true;
+        }
+    }
+
+    static inline Time_range find_first_time( const Weekly_schedule& s1,
+            const Weekly_schedule& s2, unsigned look_start, unsigned duration ){
+        unsigned fraglen=0;
+        unsigned fragstart=look_start;
+        for(unsigned i=look_start;  i<168 && fraglen<duration;  i++){
+            if(s1.busy_time[i] || s2.busy_time[i]){
+                fragstart = i+1;
+                fraglen=0;
+            }else{
+                fraglen++;
+            }
+        }
+
+        if(fraglen < duration)
+            return Time_range{};
+
+        return Time_range{(int)(fragstart/24), (int)(fragstart%24), (int)duration};
+    }
+
+    
+
+    static inline Time_range find_first( const List<Weekly_schedule*>& ss, unsigned look_start, unsigned duration ){
+        unsigned fraglen=0;
+        unsigned fragstart=look_start;
+        for(unsigned i=look_start;  i<168 && fraglen<duration;  i++){
+            
+            bool notgood = false;
+            for( const auto& s : ss ){
+                if( s->busy_time[i] ){
+                    notgood = true;
+                    break;
+                }
+            }
+
+            if(notgood){
+                fragstart = i+1;
+                fraglen=0;
+            }else{
+                fraglen++;
+            }
+        }
+
+        if(fraglen < duration)
+            return Time_range{};
+
+        return Time_range{(int)(fragstart/24), (int)(fragstart%24), (int)duration};
+    }
+
+
+
+    inline void clear() noexcept {
+        for(int i=0; i<168;  i++){
+            busy_time[i] = false;
+        }
+    }
+
 };
 
 
@@ -463,6 +570,7 @@ class Peoples {
 
     List<Set<Connection>> m_connections;
     List<Set<Event_idx>> m_events;
+    List<Weekly_schedule> m_weekly_schedules;
 
     inline void check_integrity() const {
         if(
@@ -480,7 +588,8 @@ class Peoples {
             m_count != m_jobs.size() ||
             m_count != m_homes.size() ||
             m_count != m_connections.size() ||
-            m_count != m_events.size()
+            m_count != m_events.size() ||
+            m_count != m_weekly_schedules.size()
         ) throw std::string{"Peoples integrity error"};
     }
 
@@ -503,7 +612,8 @@ public:
         Job_idx job,
         Residence_idx home,
         const Set<Connection>& connections,
-        const Set<Event_idx>& events
+        const Set<Event_idx>& events,
+        const Weekly_schedule& weekly_schedule
     ){
         m_count++;
         m_sexes.push_back(sex);
@@ -521,6 +631,7 @@ public:
         m_homes.push_back(home);
         m_connections.push_back(connections);
         m_events.push_back(events);
+        m_weekly_schedules.push_back(weekly_schedule);
         check_integrity();
     }
 
@@ -613,13 +724,14 @@ public:
         return m_events[idx];
     }
 
+    inline Weekly_schedule& weekly_schedule(People_idx idx){
+        if(idx >= m_count) throw std::string{"People idx out of range: index "} + std::to_string(idx) + ", size " + std::to_string(m_count);
+        return m_weekly_schedules[idx];
+    }
+
     double get_simpathy( People_idx p, People_idx target );
 };
 
-
-
-struct Location{ // todo
-                 };
 
 class Group_event{
 public:
@@ -741,9 +853,9 @@ class World{
 
 public:
 
-    World(size_t people_count);
+    World(size_t people_count, const std::vector<Location>& locations);
 
-    void update(Time_range time, bool rent_pay_time);
+    void update(Time_range time, bool rent_pay_time, const std::vector<Location>& locations);
 
     void print();
 
@@ -756,8 +868,9 @@ public:
 
     inline void add_apartman(
             Residence_idx max_resident_count,
-            const List<Residence_idx>& _residenceses){
-        apartmans.add(max_resident_count, _residenceses );
+            const List<Residence_idx>& _residenceses,
+            const Location& location){
+        apartmans.add(max_resident_count, _residenceses, location );
     }
 
     inline void add_job(
@@ -773,8 +886,9 @@ public:
 
     inline void add_workplace(
             uint16_t max_job_count,
-            const List<Job_idx>& _jobs){
-        workplaces.add(max_job_count, _jobs);
+            const List<Job_idx>& _jobs,
+            const Location& location){
+        workplaces.add(max_job_count, _jobs, location);
     }
 
     inline void add_people(
@@ -792,10 +906,11 @@ public:
         Job_idx job,
         Residence_idx home,
         const Set<Connection>& connections,
-        const Set<Event_idx>& events){
+        const Set<Event_idx>& events,
+        const Weekly_schedule& weekly_schedule){
 
         peoples.add(sex, alive, elszantsag, optimizmus, szabalykovetes, szepseg,
-            erosseg, okossag, hangulat, balance, name, job, home, connections, events );
+            erosseg, okossag, hangulat, balance, name, job, home, connections, events, weekly_schedule);
     }
  
 };

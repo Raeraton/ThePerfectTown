@@ -1,8 +1,10 @@
+#include "location.hpp"
 #include <iostream>
 #include <n_npc.hpp>
 #include <background_traffic.hpp>
 #include <ctime>
 #include <chrono>
+#include <vector>
 
 
 void npc_bm(int argc, char** argv){
@@ -19,7 +21,8 @@ try{
 
 
     auto tp = std::chrono::high_resolution_clock::now();
-    game::npc::World world{population};
+    std::vector<game::map::location::Location> locations = { {{0,0},{0,0},{0,0} } };
+    game::npc::World world{population, locations};
     auto tp2 =  std::chrono::high_resolution_clock::now();
     double dur1 = std::chrono::duration<double>(tp2 - tp).count();
 
@@ -27,7 +30,7 @@ try{
     for( size_t _=0; _<iteration; _++ ){
         int day = (_ / 24) % 7;
         int hour = _ % 24;
-        world.update(game::npc::Time_range{day, hour}, (_+1)%(168*4)==0);
+        world.update(game::npc::Time_range{day, hour}, (_+1)%(168*4)==0, locations);
     }
     
     tp = std::chrono::high_resolution_clock::now();
@@ -63,15 +66,26 @@ void bg_graph_bm(int argc, char** argv) {
     }if(argc >= 4 ){
         end = std::atoi(argv[3]);
     }if(argc >= 5 ){
-        range = std::atoi(argv[4]);
+        range = std::atoi(argv[4]) + 1;
     }
+    
+    std::cout << "width: " << width << "\nstart: " << start << "\nend: " << end
+                << "\nrange " << range << "\n";
 
     game::traffic::backgound::Graph graph{};
 
     int node_count = 0;
     for( int i=0;  i<width*width;  i++){
         node_count++;
-        graph.add_node(game::traffic::backgound::Node{});
+        int y = i/width;
+        int x = i%width;
+        double lambde = rand() % range;
+        graph.add_node(game::traffic::backgound::Node{
+            game::traffic::backgound::Position{
+                (double)x * lambde, (double)y * lambde // geometric bulshit to
+                                                       // imagine :)
+            }
+        });
     }
 
     int edge_count = 0;
@@ -87,7 +101,8 @@ void bg_graph_bm(int argc, char** argv) {
                     int idx = y*width + x;
                     int idx0 = yy*width + xx;
                     edge_count++;
-                    graph.add_edge(game::traffic::backgound::Edge{1, (double)(rand()%range)+1.0, (game::traffic::backgound::Node_idx)idx0}, idx);
+
+                    graph.add_edge(game::traffic::backgound::Edge{ 50, (game::traffic::backgound::Node_idx)idx0 }, idx);
                 }
             }
         }
@@ -95,6 +110,10 @@ void bg_graph_bm(int argc, char** argv) {
     
     auto tp = std::chrono::high_resolution_clock::now();
     auto path = graph.calculate_shortest_path(start, end);
+    
+    game::traffic::backgound::Time_table time_table{};
+    time_table.add_trip(0, 3.0, path, graph);
+
     double time = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - tp).count();
     
 
@@ -130,6 +149,15 @@ void bg_graph_bm(int argc, char** argv) {
     for(int i=0;  i<width*2; i++){
         std::cout << lines[i] << "\n";
     }
+
+    std::cout << "=================\\ time_table \\=================\n";
+    
+    time_table.do_all([&](game::traffic::backgound::Edge_idx edge, const std::vector<game::traffic::backgound::Time_table::Time_range>& tr){
+        std::cout << "edge " << edge << " lenght: " << graph.edge(edge).lenght << " speed limit: " << graph.edge(edge).speed_limit << "\n";
+        for( const auto& time_range : tr ){
+            std::cout << "\t id: " << time_range.id << " enter: " << time_range.start << " leave: " << time_range.end << "\n";
+        }
+    });
     
     std::cout <<    "=======================\n     results       \n" <<
                     "=======================\n";
