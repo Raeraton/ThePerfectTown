@@ -2,9 +2,56 @@
 #include <algorithm>
 #include <background_traffic.hpp>
 #include <limits>
+#include <fstream>
 
 
 namespace game::traffic::backgound{
+
+
+
+    Graph Graph::read_from_text_file(const char* path){
+        std::ifstream file{path};
+        if( ! file.is_open() )
+            throw std::string{"Graph::read_from_text_file path cannot be opened"};
+
+        Graph graph;
+
+        Edge_idx edge_count;
+        Node_idx node_count;
+        file >> node_count >> edge_count;
+
+        std::map<Node_idx, Node_idx> node_idx_translation_map;
+
+        for( Node_idx i=0;  i<node_count;  i++){
+            Node_idx id;
+            double x, y;
+            file >> id >> x >> y;
+
+            Node_idx given_idx = graph.add_node( Node{Position{x, y}} );
+            if( id != given_idx )
+                node_idx_translation_map[id] = given_idx;
+        }
+
+        for( Edge_idx i=0;  i<edge_count;  i++){
+            Edge_idx id;
+            Node_idx from, to;
+            file >> id >> from >> to;
+
+            auto from_it = node_idx_translation_map.find(from);
+            auto to_it = node_idx_translation_map.find(to);
+
+            if(from_it != node_idx_translation_map.end())
+                from = from_it->second;
+            if(to_it != node_idx_translation_map.end())
+                to = to_it->second;
+
+            graph.add_edge( Edge{ 50, to }, from );
+        }
+
+        return graph;
+
+
+    }
 
 
     /// dijkstra
@@ -33,7 +80,7 @@ namespace game::traffic::backgound{
 
                 const Edge& edge = m_edges[e];
                 
-                double cdist = current_dist + (edge.lenght/edge.speed_limit*3.6);
+                double cdist = current_dist + edge.lenght;
                 auto edist_it = dist_map.find(edge.to);
                 
                 if( edist_it == dist_map.end() ){

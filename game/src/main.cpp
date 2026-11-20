@@ -1,4 +1,5 @@
 #include "location.hpp"
+#include <cstdlib>
 #include <iostream>
 #include <n_npc.hpp>
 #include <background_traffic.hpp>
@@ -170,6 +171,43 @@ void bg_graph_bm(int argc, char** argv) {
 
 
 
+void map_test(int argc, char** argv){
+
+
+    int start_idx=0;
+    int end_idx = 100;
+    if(argc > 0){
+        start_idx = std::atoi(argv[0]);
+    }
+    if(argc > 1){
+        end_idx = std::atoi(argv[1]);
+    }
+
+    using namespace game::traffic::backgound;
+    using namespace game::npc;
+    using namespace std;
+
+    using clock = std::chrono::high_resolution_clock;
+    using duration = std::chrono::duration<double>;
+
+    
+    auto time_point = clock::now();
+    Graph graph = Graph::read_from_text_file("graph.txt");
+    double time = duration(clock::now() - time_point).count();
+
+    auto path = graph.calculate_shortest_path(start_idx, end_idx);
+
+    for(auto& node : path ){
+        cout << node << "\n";
+    }
+
+    cout << "========================\n time: " << time << "\tsec\n========================\n";
+
+}
+
+
+
+
 int main(int argc, char** argv){
     srand(std::time(NULL));
 
@@ -183,6 +221,8 @@ int main(int argc, char** argv){
         bg_graph_bm(argc-1, argv+1);
     }else if(argv[1][0] == 'n'){
         npc_bm(argc-1, argv+1);
+    }else if(argv[1][0] == 'm'){
+        map_test(argc-2, argv+2); // different offset used :)
     }else{
         std::cout << "wtf\n";
     }

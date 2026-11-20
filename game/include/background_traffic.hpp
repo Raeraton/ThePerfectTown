@@ -47,6 +47,8 @@ class Graph{
 
 public:
 
+    static Graph read_from_text_file(const char* path);
+
     inline void assert_node_valid( Node_idx node ) const {
         if(node >= m_nodes.size() )
             throw std::string{"game::traffic::background::Graph node is invalid: "}
