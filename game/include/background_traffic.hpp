@@ -69,12 +69,14 @@ public:
     }
 
 
+    inline Node_idx node_count() const {return (Node_idx)m_nodes.size();}
     inline Node& node(Node_idx i){
         if( i >= m_nodes.size() )
             throw std::string{"game::traffic::background::Graph node   node out of range " };
         return m_nodes[i];
     }
 
+    inline Edge_idx edge_count() const {return (Edge_idx)m_edges.size();}
     inline Edge edge(Edge_idx i){
         if( i >= m_edges.size() )
             throw std::string{"game::traffic::background::Graph node   node out of range " };

@@ -6,6 +6,8 @@
 #include <GLFW/glfw3.h>
 
 #include <render/my/app.hpp>
+#include <render/objects/roads.hpp>
+#include <background_traffic.hpp>
 
 
 struct {
@@ -34,6 +36,11 @@ class GameApp: public App{
     int window_height = 1080;
 
     GLFWwindow* window = nullptr;
+
+    game::render::objects::Roads* roads;
+
+    glm::vec2 middle{3500, 1500};
+    float scale = 0.00360729;
 
 
 public:
@@ -95,12 +102,20 @@ public:
 
     void load_content() override {
       
-
+        game::traffic::backgound::Graph g = game::traffic::backgound::Graph::read_from_text_file("walk.txt");
+        roads = new game::render::objects::Roads(g, "shaders/line.vert","shaders/line.frag");
+    
     }
 
     void update( double deltatime )override {
-
-
+    
+        float speed = deltatime * 0.7 / scale;
+        if( Inputs.move_north ) middle.y+=speed;
+        if( Inputs.move_south ) middle.y-=speed;
+        if( Inputs.move_west  ) middle.x-=speed;
+        if( Inputs.move_east  ) middle.x+=speed;
+        if( Inputs.zoom_in    ) scale *= 1-deltatime;
+        if( Inputs.zoom_out   ) scale /= 1-deltatime;
 
     }
 
@@ -112,8 +127,7 @@ public:
 
 
         // TODO
-
-
+        roads->draw( middle, scale );
 
         // Display rendered frame
         glfwSwapBuffers(window);
