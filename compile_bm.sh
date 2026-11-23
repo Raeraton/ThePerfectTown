@@ -1,0 +1,1 @@
+g++ -g -fno-omit-frame-pointer -O3 game/glad/src/gl.c game/src/*.cpp -Igame/include -lglfw -lGL -ldl -DTEST_APP_BENCHMARK -o app

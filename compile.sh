@@ -1,1 +1,1 @@
-clang++ -g -fno-omit-frame-pointer -O3 game/src/*.cpp -Igame/include -o app
+g++ -g -fno-omit-frame-pointer -O3 game/glad/src/gl.c game/src/*.cpp -Igame/include -lglfw -lGL -ldl -o app

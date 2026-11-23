@@ -135,7 +135,7 @@ class Building:
     corners: list[Coordinate]
     entrance: Coordinate
 
-    building_type: BuildingType = BuildingType.RESIDENTIAL
+    building_type: BuildingType = BuildingType.OTHER
 
     # Original OSM information
     osm_building: str | None = None
@@ -986,6 +986,18 @@ def graphToTextFile(
                 f"{edge.id} {edge.nfrom} {edge.nto}\n"
             )
 
+def buildingToTextFIle( buildings: list[Building], path: str) -> None:
+    with open(path, "wt") as file:
+
+        file.write( f"{len(buildings)}\n" )
+
+        for building in buildings:
+            # type
+            file.write( f"{building.building_type} {len(building.corners)} " )
+            for corner in building.corners:
+                file.write( f"{corner.x} {corner.y} " )
+            file.write("\n")
+
 
 # ==================================================
 # MAIN
@@ -1046,6 +1058,8 @@ def main():
         walk_edges,
         "walk.txt"
     )
+
+    buildingToTextFIle(buildings, "buildings.txt")
 
     # Visualize everything
     plotGraph(

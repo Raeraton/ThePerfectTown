@@ -2,6 +2,7 @@
 #define LOCATION_HPP
 
 #include <cmath>
+#include <vector>
 
 namespace game::map::location{
 
@@ -20,11 +21,11 @@ struct Position{
 
 
 struct Location{
-    Position    position,
-                top_left,
-                bottom_right;
-    Location(const Position& p, const Position&  tl, const Position& br)
-        : position(p), top_left(tl), bottom_right(br) {}
+    Position    position;
+    std::vector<Position> corners;
+    Location() = default;
+    Location(const Position& p, const std::vector<Position>& cs)
+        : position(p), corners(cs) {}
 };
 
 
