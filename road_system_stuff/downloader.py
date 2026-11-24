@@ -3,6 +3,7 @@ from pyproj import Transformer
 
 from graph_conversion import convert_graph
 from lane_graph import create_lane_graph
+from walk_path import prepare_walk_graph
 
 
 class MapDownloader:
@@ -32,21 +33,10 @@ class MapDownloader:
         graph = ox.graph_from_place(city, network_type="walk")
         graph = ox.project_graph(graph, to_crs=self.drive_crs)
 
-        sidewalk_edges = {
-            (u, v, key)
-            for u, v, key, data in graph.edges(keys=True, data=True)
-            #if data.get("footway") == "sidewalk"
-        }
+        boundary_gdf = ox.geocode_to_gdf(city).to_crs(self.drive_crs)
+        city_boundary = boundary_gdf.geometry.union_all()
 
-        graph.remove_edges_from([
-            (u, v, key)
-            for u, v, key in graph.edges(keys=True)
-            if (u, v, key) not in sidewalk_edges
-        ])
-        graph.remove_nodes_from([
-            node for node, degree in graph.degree()
-            if degree == 0
-        ])
+        graph = prepare_walk_graph(graph, self.drive_graph, city_boundary)
 
         return convert_graph(graph, self.origin_x, self.origin_y)
 

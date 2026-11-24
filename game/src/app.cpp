@@ -33,8 +33,8 @@ struct {
 class GameApp: public App{
 
 
-    int window_width = 1920;
-    int window_height = 1080;
+    int window_width = 640;
+    int window_height = 640;
 
     GLFWwindow* window = nullptr;
 
@@ -104,7 +104,7 @@ public:
 
     void load_content() override {
       
-        game::traffic::backgound::Graph g = game::traffic::backgound::Graph::read_from_text_file("lanes.txt");
+        game::traffic::backgound::Graph g = game::traffic::backgound::Graph::read_from_text_file("walk.txt");
         roads = new game::render::objects::Roads(g, "shaders/basic.vert","shaders/basic.frag");
     
         game::map::Map map;
