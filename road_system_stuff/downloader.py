@@ -14,6 +14,7 @@ class MapDownloader:
         self.origin_y = 0.0
         self.transformer = None
         self.drive_graph = None
+        self.buildings = None
 
     def download_drive_graph(self, city: str):
         progress = ProgressBar("Downloading driving graph", None)
@@ -54,6 +55,9 @@ class MapDownloader:
             graph,
             self.drive_graph,
             city_boundary,
+            buildings=self.buildings,
+            origin_x=self.origin_x,
+            origin_y=self.origin_y,
             progress_callback=process_progress.update,
         )
         process_progress.finish()
@@ -63,13 +67,14 @@ class MapDownloader:
 
     def download_buildings(self, city: str):
         from building_downloader import download_buildings
-        return download_buildings(
+        self.buildings = download_buildings(
             city,
             self.drive_crs,
             self.origin_x,
             self.origin_y,
             self.transformer,
         )
+        return self.buildings
 
     def download_lane_graph(self, city: str):
         if self.drive_graph is None:

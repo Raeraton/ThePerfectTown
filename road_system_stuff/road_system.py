@@ -1037,12 +1037,12 @@ def main():
     print(f"Driving nodes: {len(drive_nodes)}")
     print(f"Driving edges: {len(drive_edges)}")
 
+    buildings = downloader.download_buildings(city)
+    print(f"Buildings: {len(buildings)}")
+
     walk_nodes, walk_edges = downloader.download_walk_graph(city)
     print(f"Walking nodes: {len(walk_nodes)}")
     print(f"Walking edges: {len(walk_edges)}")
-
-    buildings = downloader.download_buildings(city)
-    print(f"Buildings: {len(buildings)}")
 
     lane_nodes, lane_edges = downloader.download_lane_graph(city)
     print(f"Traffic lane nodes: {len(lane_nodes)}")

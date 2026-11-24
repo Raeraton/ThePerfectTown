@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import networkx as nx
-from shapely.geometry import LineString, MultiLineString, Point
+from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
@@ -10,6 +10,7 @@ import progress
 SIDEWALK_OFFSET_METERS = 2.5
 SIDEWALK_RESAMPLE_SPACING_METERS = 20.0
 SIDEWALK_MERGE_DISTANCE_METERS = 8.0
+SIDEWALK_BUILDING_DISTANCE_METERS = 100.0
 
 
 def edge_line(graph, u, v, data) -> LineString | None:
@@ -84,6 +85,9 @@ def prepare_walk_graph(
     walk_graph,
     drive_graph,
     city_boundary,
+    buildings=None,
+    origin_x: float = 0.0,
+    origin_y: float = 0.0,
     progress_callback=None,
 ):
     """Build sidewalks only inside the city and beside driving-road edges."""
@@ -95,6 +99,18 @@ def prepare_walk_graph(
     drive_lines = collect_drive_lines(drive_graph)
     road_tree = STRtree(drive_lines)
     road_buffer = unary_union([line.buffer(0.5) for line in drive_lines])
+
+    building_polygons = []
+    if buildings:
+        building_polygons = [
+            Polygon([
+                (corner.x + origin_x, corner.y + origin_y)
+                for corner in building.corners
+            ])
+            for building in buildings
+            if len(building.corners) >= 3
+        ]
+    building_tree = STRtree(building_polygons) if building_polygons else None
 
     drive_edge_index = 0
 
@@ -185,11 +201,62 @@ def prepare_walk_graph(
         road_tree=road_tree,
     )
     remove_crossing_sidewalk_edges(clean_graph, road_buffer)
+    remove_sidewalk_nodes_too_far_from_buildings(
+        clean_graph,
+        building_polygons,
+        building_tree,
+    )
 
     isolated_nodes = [node for node, degree in dict(clean_graph.degree()).items() if degree == 0]
     clean_graph.remove_nodes_from(isolated_nodes)
 
     return clean_graph
+
+
+def remove_sidewalk_nodes_too_far_from_buildings(
+    graph,
+    building_polygons: list,
+    building_tree: STRtree | None,
+    max_distance: float = SIDEWALK_BUILDING_DISTANCE_METERS,
+) -> None:
+    """Remove each sidewalk node farther than max_distance from every building."""
+    if building_tree is None:
+        return
+
+    nodes_to_remove: list[int] = []
+
+    for node_id, data in graph.nodes(data=True):
+        point = Point(data["x"], data["y"])
+        nearest_indexes = building_tree.query(point.buffer(max_distance))
+
+        nearest_distance = min(
+            (
+                point.distance(building_polygons[int(index)])
+                for index in nearest_indexes
+            ),
+            default=float("inf"),
+        )
+
+        if nearest_distance > max_distance:
+            nodes_to_remove.append(node_id)
+
+    graph.remove_nodes_from(nodes_to_remove)
+
+
+def sidewalk_near_buildings(
+    sidewalk: LineString,
+    building_polygons: list,
+    building_tree: STRtree | None,
+    max_distance: float = SIDEWALK_BUILDING_DISTANCE_METERS,
+) -> bool:
+    """Return True if the sidewalk segment is within the building-distance limit."""
+    if building_tree is None:
+        return True
+
+    for possible_index in building_tree.query(sidewalk.buffer(max_distance)):
+        if sidewalk.distance(building_polygons[int(possible_index)]) <= max_distance:
+            return True
+    return False
 
 
 def collect_drive_lines(drive_graph) -> list[LineString]:
@@ -212,6 +279,21 @@ def sidewalk_segment_crosses_road(
 
     for possible_index in road_tree.query(segment):
         if segment.intersects(drive_lines[int(possible_index)]):
+            return True
+    return False
+
+
+def sidewalk_segment_crosses_building(
+    segment: LineString,
+    building_polygons: list[Polygon],
+    building_tree: STRtree | None = None,
+) -> bool:
+    """Reject segments that cross or intersect a nearby building footprint."""
+    if building_tree is None:
+        building_tree = STRtree(building_polygons)
+
+    for possible_index in building_tree.query(segment):
+        if segment.intersects(building_polygons[int(possible_index)]):
             return True
     return False
 
