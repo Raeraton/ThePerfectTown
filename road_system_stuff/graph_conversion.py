@@ -1,4 +1,5 @@
 from models import Node, Edge
+from progress import ProgressBar
 
 
 def convert_graph(graph, origin_x: float, origin_y: float) -> tuple[list[Node], list[Edge]]:
@@ -11,16 +12,25 @@ def convert_graph(graph, origin_x: float, origin_y: float) -> tuple[list[Node], 
         for new_id, osm_id in enumerate(graph.nodes)
     }
 
-    for osm_id, data in graph.nodes(data=True):
+    node_progress = ProgressBar("Converting graph nodes", len(graph.nodes))
+    node_progress.start()
+
+    for node_index, (osm_id, data) in enumerate(graph.nodes(data=True), start=1):
         nodes.append(Node(
             id=osm_to_node_id[osm_id],
             x=data["x"] - origin_x,
             y=data["y"] - origin_y,
         ))
+        node_progress.update(node_index)
 
+    node_progress.finish()
     next_node_id = len(nodes)
 
-    for u, v, key, data in graph.edges(keys=True, data=True):
+    edge_progress = ProgressBar("Converting graph edges", len(graph.edges))
+    edge_progress.start()
+
+    edge_count = len(graph.edges)
+    for edge_index, (u, v, key, data) in enumerate(graph.edges(keys=True, data=True), start=1):
         geometry = data.get("geometry")
 
         if geometry is not None:
@@ -28,6 +38,7 @@ def convert_graph(graph, origin_x: float, origin_y: float) -> tuple[list[Node], 
             ux, uy = graph.nodes[u]["x"], graph.nodes[u]["y"]
             vx, vy = graph.nodes[v]["x"], graph.nodes[v]["y"]
             start = coordinates[0]
+
             if (
                 (start[0] - vx) ** 2 + (start[1] - vy) ** 2
                 < (start[0] - ux) ** 2 + (start[1] - uy) ** 2
@@ -56,4 +67,7 @@ def convert_graph(graph, origin_x: float, origin_y: float) -> tuple[list[Node], 
                 nto=road_nodes[i + 1],
             ))
 
+        edge_progress.update(edge_index)
+
+    edge_progress.finish()
     return nodes, edges

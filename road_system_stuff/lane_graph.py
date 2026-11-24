@@ -3,6 +3,7 @@ import math
 from shapely.geometry import LineString
 
 from models import Node, Edge
+from progress import ProgressBar
 
 
 TRAFFIC_LANE_WIDTH = 3.5
@@ -237,7 +238,12 @@ def create_lane_graph(graph, origin_x: float, origin_y: float) -> tuple[list[Nod
     position_nodes: dict[tuple[int, int], int] = {}
     edge_pairs: set[tuple[int, int]] = set()
 
-    for u, v, key, data in graph.edges(keys=True, data=True):
+    road_edges = list(graph.edges(keys=True, data=True))
+    progress = ProgressBar("Processing traffic lanes", len(road_edges))
+    progress.start()
+
+    for road_index, (u, v, key, data) in enumerate(road_edges, start=1):
+        progress.update(road_index)
         if str(data.get("oneway", "no")).lower() in {"yes", "true", "1", "-1"}:
             road_pair = (u, v, str(key))
         else:
@@ -296,7 +302,14 @@ def create_lane_graph(graph, origin_x: float, origin_y: float) -> tuple[list[Nod
                     (lane_nodes, lane_line, lane_index, lane_count, restrictions)
                 )
 
-    for intersection_id in set(incoming_segments) & set(outgoing_segments):
+    progress.finish()
+
+    turn_progress = ProgressBar("Connecting lane turns", len(incoming_segments))
+    turn_progress.start()
+
+    for turn_index, intersection_id in enumerate(set(incoming_segments) & set(outgoing_segments), start=1):
+        turn_progress.update(turn_index)
+
         incoming = incoming_segments[intersection_id]
         outgoing = outgoing_segments[intersection_id]
 
@@ -320,5 +333,7 @@ def create_lane_graph(graph, origin_x: float, origin_y: float) -> tuple[list[Nod
                     nfrom=incoming_nodes[-1],
                     nto=outgoing_nodes[0],
                 ))
+
+    turn_progress.finish()
 
     return nodes, edges

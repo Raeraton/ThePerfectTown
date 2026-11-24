@@ -4,6 +4,7 @@ from pyproj import Transformer
 from graph_conversion import convert_graph
 from lane_graph import create_lane_graph
 from walk_path import prepare_walk_graph
+from progress import ProgressBar
 
 
 class MapDownloader:
@@ -15,7 +16,10 @@ class MapDownloader:
         self.drive_graph = None
 
     def download_drive_graph(self, city: str):
+        progress = ProgressBar("Downloading driving graph", None)
+        progress.start()
         graph = ox.graph_from_place(city, network_type="drive")
+        progress.update(0, "projecting")
         graph = ox.project_graph(graph)
 
         self.drive_graph = graph
@@ -24,21 +28,38 @@ class MapDownloader:
         self.origin_y = min(data["y"] for _, data in graph.nodes(data=True))
         self.transformer = Transformer.from_crs("EPSG:4326", self.drive_crs, always_xy=True)
 
-        return convert_graph(graph, self.origin_x, self.origin_y)
+        converted = convert_graph(graph, self.origin_x, self.origin_y)
+        progress.finish()
+        return converted
 
     def download_walk_graph(self, city: str):
         if self.drive_crs is None:
             raise RuntimeError("Download the driving graph first.")
 
+        download_progress = ProgressBar("Downloading walking graph", None)
+        download_progress.start()
         graph = ox.graph_from_place(city, network_type="walk")
         graph = ox.project_graph(graph, to_crs=self.drive_crs)
+        download_progress.finish()
 
+        boundary_progress = ProgressBar("Downloading city boundary", None)
+        boundary_progress.start()
         boundary_gdf = ox.geocode_to_gdf(city).to_crs(self.drive_crs)
         city_boundary = boundary_gdf.geometry.union_all()
+        boundary_progress.finish()
 
-        graph = prepare_walk_graph(graph, self.drive_graph, city_boundary)
+        process_progress = ProgressBar("Processing sidewalk graph", graph.number_of_edges())
+        process_progress.start()
+        graph = prepare_walk_graph(
+            graph,
+            self.drive_graph,
+            city_boundary,
+            progress_callback=process_progress.update,
+        )
+        process_progress.finish()
 
-        return convert_graph(graph, self.origin_x, self.origin_y)
+        converted = convert_graph(graph, self.origin_x, self.origin_y)
+        return converted
 
     def download_buildings(self, city: str):
         from building_downloader import download_buildings

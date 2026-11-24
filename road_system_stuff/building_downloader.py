@@ -3,6 +3,7 @@ import osmnx as ox
 from building_classifier import classify_building
 from models import Building, Coordinate
 from tag_helpers import parse_float, parse_int, clean_tag
+from progress import ProgressBar
 
 
 def download_buildings(city: str, drive_crs, origin_x: float, origin_y: float, transformer):
@@ -12,15 +13,19 @@ def download_buildings(city: str, drive_crs, origin_x: float, origin_y: float, t
     buildings_gdf = ox.features_from_place(city, tags={"building": True})
     buildings_gdf = buildings_gdf.to_crs(drive_crs)
     buildings: list[Building] = []
+    progress = ProgressBar("Processing buildings", len(buildings_gdf))
+    progress.start()
 
-    for _, data in buildings_gdf.iterrows():
+    for building_index, (_, data) in enumerate(buildings_gdf.iterrows(), start=1):
         geometry = data.geometry
         if geometry is None or geometry.is_empty:
+            progress.update(building_index)
             continue
 
         if geometry.geom_type == "MultiPolygon":
             geometry = max(geometry.geoms, key=lambda polygon: polygon.area)
         if geometry.geom_type != "Polygon":
+            progress.update(building_index)
             continue
 
         corners = [
@@ -28,6 +33,7 @@ def download_buildings(city: str, drive_crs, origin_x: float, origin_y: float, t
             for x, y in list(geometry.exterior.coords)[:-1]
         ]
         if len(corners) < 3:
+            progress.update(building_index)
             continue
 
         point = geometry.representative_point()
@@ -47,7 +53,9 @@ def download_buildings(city: str, drive_crs, origin_x: float, origin_y: float, t
                 if key != "geometry" and clean_tag(value) is not None
             },
         ))
+        progress.update(building_index)
 
+    progress.finish()
     return buildings
 
 
