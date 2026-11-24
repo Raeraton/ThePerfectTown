@@ -1,5 +1,13 @@
+from downloader import MapDownloader
+from file_saver import save_graph, save_buildings
+from plotter import plot_graph, plot_lane_graph
 
-import os
+
+"""
+Legacy monolithic implementation below is kept only as inert documentation.
+The executable application is provided entirely by the modular imports above.
+"""
+
 import re
 import math
 
@@ -591,7 +599,7 @@ def downloadDriveGraph(city: str) -> tuple[list[Node], list[Edge]]:
 # ==================================================
 
 def downloadWalk(city: str) -> tuple[list[Node], list[Edge]]:
-    """Download and convert the walking network."""
+    """Download and convert only explicitly mapped sidewalk ways."""
 
     if DRIVE_CRS is None:
         raise RuntimeError(
@@ -607,6 +615,24 @@ def downloadWalk(city: str) -> tuple[list[Node], list[Edge]]:
         G,
         to_crs=DRIVE_CRS
     )
+
+    sidewalk_edges = {
+        (u, v, key)
+        for u, v, key, data in G.edges(keys=True, data=True)
+        if data.get("footway") == "sidewalk"
+    }
+
+    G.remove_edges_from([
+        (u, v, key)
+        for u, v, key in G.edges(keys=True)
+        if (u, v, key) not in sidewalk_edges
+    ])
+
+    G.remove_nodes_from([
+        node
+        for node, degree in G.degree()
+        if degree == 0
+    ])
 
     return convertGraph(G, ORIGIN_X, ORIGIN_Y)
 
@@ -1004,71 +1030,44 @@ def buildingToTextFIle( buildings: list[Building], path: str) -> None:
 # ==================================================
 
 def main():
-
     city = "Barcs, Hungary"
+    downloader = MapDownloader()
 
-    # Download driving graph
-    drive_nodes, drive_edges = downloadDriveGraph(city)
-
+    drive_nodes, drive_edges = downloader.download_drive_graph(city)
     print(f"Driving nodes: {len(drive_nodes)}")
     print(f"Driving edges: {len(drive_edges)}")
 
-    # Download walking graph
-    walk_nodes, walk_edges = downloadWalk(city)
-
+    walk_nodes, walk_edges = downloader.download_walk_graph(city)
     print(f"Walking nodes: {len(walk_nodes)}")
     print(f"Walking edges: {len(walk_edges)}")
 
-    # Download buildings
-    buildings = downloadBuildings(city)
-
+    buildings = downloader.download_buildings(city)
     print(f"Buildings: {len(buildings)}")
 
-    # Print building statistics
+    lane_nodes, lane_edges = downloader.download_lane_graph(city)
+    print(f"Traffic lane nodes: {len(lane_nodes)}")
+    print(f"Traffic lane edges: {len(lane_edges)}")
+
     building_counts = {}
-
     for building in buildings:
-
-        building_type = building.building_type
-
-        building_counts[building_type] = (
-            building_counts.get(building_type, 0) + 1
+        building_counts[building.building_type] = (
+            building_counts.get(building.building_type, 0) + 1
         )
 
     print("\nBuilding statistics:")
-
     for building_type, count in sorted(
         building_counts.items(),
-        key=lambda item: item[0].value
+        key=lambda item: item[0].value,
     ):
+        print(f"{building_type.value}: {count}")
 
-        print(
-            f"{building_type.value}: {count}"
-        )
+    save_graph(drive_nodes, drive_edges, "drive.txt")
+    save_graph(lane_nodes, lane_edges, "lanes.txt")
+    save_graph(walk_nodes, walk_edges, "walk.txt")
+    save_buildings(buildings, "buildings.txt")
 
-    # Save graphs
-    graphToTextFile(
-        drive_nodes,
-        drive_edges,
-        "drive.txt"
-    )
-
-    graphToTextFile(
-        walk_nodes,
-        walk_edges,
-        "walk.txt"
-    )
-
-    buildingToTextFIle(buildings, "buildings.txt")
-
-    # Visualize everything
-    plotGraph(
-        drive_nodes,
-        drive_edges,
-        walk_nodes,
-        walk_edges,
-        buildings
-    )
+    plot_graph(drive_nodes, drive_edges, walk_nodes, walk_edges, buildings)
+    plot_lane_graph(lane_nodes, lane_edges)
 
 
 if __name__ == "__main__":

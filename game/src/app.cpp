@@ -104,7 +104,7 @@ public:
 
     void load_content() override {
       
-        game::traffic::backgound::Graph g = game::traffic::backgound::Graph::read_from_text_file("drive.txt");
+        game::traffic::backgound::Graph g = game::traffic::backgound::Graph::read_from_text_file("lanes.txt");
         roads = new game::render::objects::Roads(g, "shaders/basic.vert","shaders/basic.frag");
     
         game::map::Map map;

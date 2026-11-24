@@ -19,61 +19,25 @@ inline static float cross( glm::vec2 a, glm::vec2 b){
 
 
 
-bool intersect( glm::vec2 l1p1, glm::vec2 l1p2, glm::vec2 l2p1, glm::vec2 l2p2 ){    
-    // p11(a,b) p12(c,d)
-    // p21(e,f) p22(g,h)
-    //
-    // l1(t) = t*p11 + (1-t)*p12
-    // l2(t) = t*p21 + (1-t)*p22
-    // -------------------------------------
-    // t1*a + (1-t1)*c = t2*e + (1-t2)*g
-    // t1*b + (1-t1)*d = t2*f + (1-t2)*h
-    // -------------------------------------
-    // t1*a + (1-t1)*c = t1*(a-c) + c
-    // t1*b + (1-t1)*d = t1*(b-d) + d
-    // t2*e + (1-t2)*g = t2*(e-g) + g
-    // t2*f + (1-t2)*h = t2*(f-h) + h
-    // -------------------------------------
-    // t1 = (t2*(e-g) + g-c) / (a-c)
-    // t2 = (t1*(b-d) + d-h) / (f-h)
-    // ------------------------------------- t1
-    // t1 = ((t1*(b-d) + d-h) / (f-h) * (e-g) + g-c) / (a-c)
-    // t1 = (t1*(b-d) + d-h) / (f-h) * (e-g) / (a-c) + (g-c) / (a-c)
-    //
-    // K = (e-g) / ((f-h)*(a-c))
-    // G = (g-c) / (a-c)
-    //
-    // t1 = K * (t1*(b-d) + d-h) + G
-    // t1 = t1*K*(b-d) + K*(d-h) + G
-    // t1 - t1*K*(b-d) = K*(d-h) + G
-    // t1 * (1 - K*(b-d)) = K*(d-h) + G
-    //
-    // C = K*(d-h) + G
-    // L = 1 - K*(b-d)
-    //
-    // t1 = C / L
-    // ------------------------------------ t2
-    // t2 = (t1*(b-d) + d-h) / (f-h)
+bool intersect(
+    glm::vec2 p1, glm::vec2 p2,
+    glm::vec2 q1, glm::vec2 q2
+) {
+    glm::vec2 r = p2 - p1;
+    glm::vec2 s = q2 - q1;
 
-    float   a = l1p1.x,
-            b = l1p1.y,
-            c = l1p2.x,
-            d = l1p2.y,
-            e = l2p1.x,
-            f = l2p1.y,
-            g = l2p2.x,
-            h = l2p2.y;
-    
-    float   K = (e-g) / ((f-h)*(a-c)),
-            G = (g-c) / (a-c);
+    float denominator = cross(r, s);
 
-    float   C = K*(d-h) + G,
-            L = 1 - K*(b-d);
-    
-    float t1 = C / L;
-    float t2 = (t1*(b-d) + d-h) / (f-h);
+    if (std::abs(denominator) < 1e-6f)
+        return false;
 
-    return 0<=t1&&t1<=1 && 0<=t2&&t2<=1;
+    glm::vec2 qp = q1 - p1;
+
+    float t = cross(qp, s) / denominator;
+    float u = cross(qp, r) / denominator;
+
+    return t >= 0 && t <= 1 &&
+           u >= 0 && u <= 1;
 }
 
 
