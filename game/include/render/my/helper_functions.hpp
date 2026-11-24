@@ -31,6 +31,4 @@ void set_uniform( GLint loc, float f );
 
 void create_render_target( GLuint* fbo, GLuint* texture, GLuint* depth, int w, int h );
 
-
-
 #endif

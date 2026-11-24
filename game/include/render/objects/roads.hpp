@@ -1,8 +1,6 @@
 #ifndef ROADS_HPP
 #define ROADS_HPP
 
-#include "background_traffic.hpp"
-
 #include <render/glad/gl.h>
 #include <GLFW/glfw3.h>
 #include <render/glm/glm.hpp>
